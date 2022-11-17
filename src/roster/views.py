@@ -40,6 +40,7 @@ from googleapiclient.errors import HttpError
 from eventlog.models import Event
 from eventlog.signals import preference_changed
 from eventlog.views import EventMixin
+from library.models import Paradata
 from messagequeue.models import Message, client_side_prefs_change
 from oauth2.bookshare.views import is_bookshare_connected, get_organization_name, \
     GENERIC_BOOKSHARE_ACCOUNT_NAMES
@@ -1496,6 +1497,23 @@ class StudentDetailsView(LoginRequiredMixin, ThemedPageMixin, SettingsPageMixin,
         # TODO: (JS) fill these in as necessary.
         self.panels = dict()
         self.panel_data = dict()
+
+        # Student Activity panel
+        self.panels['activity'] = self.clusive_student
+        if self.panels['activity']:
+            students_reading_data = Paradata.reading_data_for_period(self.clusive_user.current_period, days=self.clusive_user.student_activity_days, sort='name')
+            target_reading_data = {}
+            for one_reading_data in students_reading_data:
+                if (one_reading_data['clusive_user'] == self.clusive_student):
+                    target_reading_data = one_reading_data
+                    break
+            user = User.objects.get(pk=self.clusive_student.user_id)
+            self.panel_data['activity'] = {
+                'hours': round(target_reading_data['hours'], 1),
+                'book_count': target_reading_data['book_count'],
+                'last_login': user.last_login
+            }
+
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -1506,4 +1524,6 @@ class StudentDetailsView(LoginRequiredMixin, ThemedPageMixin, SettingsPageMixin,
         context['teacher'] = self.clusive_user
         context['roster'] = self.roster
         context['data'] = { 'days': self.days }
+        context['panels'] = self.panels
+        context['panel_data'] = self.panel_data
         return context
